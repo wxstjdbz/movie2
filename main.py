@@ -9,7 +9,7 @@ import streamlit as st
 DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
 
 st.set_page_config(
-    page_title="영화 데이터 그래프 도감 2 🎬",
+    page_title="영화 데이터 그래프 도감 🎬",
     page_icon="🍿",
     layout="wide",
 )
