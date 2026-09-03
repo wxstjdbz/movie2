@@ -1,850 +1,850 @@
-import pandas as pd
-import plotly.express as px
 import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
 
 
-# ============================================================
-# 🎬 기본 설정
-# ============================================================
-
-DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
-
+# =========================================================
+# 페이지 설정
+# =========================================================
 st.set_page_config(
     page_title="영화 데이터 그래프 도감 2",
-    page_icon="🍿",
-    layout="wide",
+    page_icon="🎬",
+    layout="wide"
 )
 
 
-# ============================================================
-# 🎀 귀엽고 깔끔한 디자인
-# ============================================================
+# =========================================================
+# 데이터 불러오기
+# =========================================================
+URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
 
+df = pd.read_csv(URL)
+
+# 장르가 여러 개라면 첫 번째 장르만 사용
+df["genre"] = (
+    df["genre"]
+    .fillna("기타")
+    .astype(str)
+    .str.split("|")
+    .str[0]
+)
+
+# 국가 결측값 처리
+df["nation"] = df["nation"].fillna("기타")
+
+# 숫자형 데이터 변환
+number_cols = [
+    "first_scrn",
+    "first_show",
+    "first_week_audi",
+    "total_audi",
+    "days_in_top10"
+]
+
+for col in number_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+# 필요한 데이터가 없는 행 제거
+df = df.dropna(
+    subset=[
+        "movieNm",
+        "genre",
+        "total_audi"
+    ]
+)
+
+
+# =========================================================
+# 화면 디자인
+# =========================================================
 st.markdown(
     """
     <style>
 
-    /* 전체 배경 */
     .stApp {
         background-color: #FFF9FC;
     }
 
-    /* 콘텐츠 폭 */
-    .block-container {
-        max-width: 1200px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
-    }
-
-    /* 메인 제목 */
     .main-title {
         text-align: center;
-        font-size: 2.8rem;
-        font-weight: 900;
-        color: #6B5B95;
-        margin-bottom: 0.3rem;
+        color: #4B3F5E;
+        font-size: 38px;
+        font-weight: 800;
+        margin-bottom: 5px;
     }
 
-    /* 부제목 */
-    .sub-title {
+    .subtitle {
         text-align: center;
-        font-size: 1.1rem;
-        color: #888888;
-        margin-bottom: 1.5rem;
+        color: #81768F;
+        font-size: 16px;
+        margin-bottom: 28px;
     }
 
-    /* 귀여운 뱃지 */
+    .section-card {
+        background-color: #FFFFFF;
+        padding: 25px;
+        border-radius: 18px;
+        border: 1px solid #EDE7F3;
+        margin-bottom: 25px;
+        box-shadow: 0 3px 12px rgba(75, 63, 94, 0.06);
+    }
+
+    .section-title {
+        color: #4B3F5E;
+        font-size: 24px;
+        font-weight: 750;
+        margin-bottom: 5px;
+    }
+
+    .section-description {
+        color: #81768F;
+        font-size: 15px;
+        margin-bottom: 15px;
+    }
+
+    .info-box {
+        background-color: #F3EEFA;
+        padding: 18px;
+        border-radius: 14px;
+        margin-top: 15px;
+        color: #554A65;
+    }
+
     .badge {
         display: inline-block;
-        padding: 6px 13px;
-        margin: 3px;
-        border-radius: 999px;
         background-color: #FCEAF3;
-        color: #A85C82;
-        font-size: 0.88rem;
+        color: #9B5C78;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 13px;
         font-weight: 700;
+        margin-bottom: 10px;
     }
 
-    /* 섹션 제목 */
-    .section-title {
-        background-color: #F3EEFA;
-        border-left: 7px solid #9B8BC4;
-        border-radius: 14px;
-        padding: 13px 20px;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-        color: #5F527F;
-        font-weight: 800;
-        font-size: 1.25rem;
-    }
-
-    /* 그래프 카드 */
-    div[data-testid="stPlotlyChart"] {
-        background-color: #FFFFFF;
-        border: 1px solid #E8E1F0;
-        border-radius: 18px;
-        padding: 8px;
-        box-shadow: 0 3px 12px rgba(100, 90, 130, 0.05);
-    }
-
-    /* 인사이트 카드 */
-    .insight-card {
-        background-color: #FFFFFF;
-        border: 1px solid #E8E1F0;
-        border-radius: 16px;
-        padding: 15px 20px;
-        margin-top: 15px;
-        margin-bottom: 8px;
-        box-shadow: 0 3px 10px rgba(100, 90, 130, 0.05);
-    }
-
-    .insight-title {
-        color: #6B5B95;
-        font-size: 1.05rem;
-        font-weight: 800;
-    }
-
-    /* 통계 카드 */
     .stat-card {
         background-color: #FFFFFF;
-        border: 1px solid #E8E1F0;
+        border: 1px solid #EDE7F3;
         border-radius: 16px;
-        padding: 17px;
+        padding: 18px;
         text-align: center;
-        box-shadow: 0 3px 10px rgba(100, 90, 130, 0.05);
+        box-shadow: 0 3px 10px rgba(75, 63, 94, 0.05);
     }
 
     .stat-number {
         color: #6B5B95;
-        font-size: 1.7rem;
-        font-weight: 900;
+        font-size: 28px;
+        font-weight: 800;
     }
 
     .stat-label {
-        color: #888888;
-        font-size: 0.9rem;
-        margin-top: 3px;
+        color: #81768F;
+        font-size: 14px;
+        margin-top: 4px;
     }
 
-    /* 입력창 */
-    div[data-testid="stTextInput"] input {
-        border-radius: 12px;
-        border: 1px solid #DED5E8;
-        background-color: #FFFFFF;
-    }
-
-    div[data-testid="stTextInput"] input:focus {
-        border-color: #9B8BC4;
-        box-shadow: 0 0 0 1px #9B8BC4;
-    }
-
-    /* 알림창 */
-    div[data-testid="stAlert"] {
-        border-radius: 14px;
-    }
-
-    /* 구분선 */
-    hr {
-        margin: 2.3rem 0;
-        border: none;
-        border-top: 2px dashed #E5DDEB;
+    .result-box {
+        background-color: #F9F5FC;
+        border-left: 5px solid #6B5B95;
+        padding: 15px 18px;
+        border-radius: 10px;
+        margin-top: 12px;
+        color: #554A65;
     }
 
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
 
-# ============================================================
-# 📦 데이터 불러오기
-# ============================================================
-
-@st.cache_data
-def load_data():
-
-    df = pd.read_csv(
-        DATA_URL,
-        dtype={
-            "movieCd": str,
-            "openDt": str,
-        },
-    )
-
-    # 장르가 여러 개라면 첫 번째 장르만 사용
-    df["genre"] = (
-        df["genre"]
-        .fillna("미상")
-        .astype(str)
-        .str.split("|", n=1)
-        .str[0]
-        .str.strip()
-        .replace("", "미상")
-    )
-
-    # 제작 국가 결측값 처리
-    df["nation"] = (
-        df["nation"]
-        .fillna("미상")
-        .astype(str)
-        .str.strip()
-        .replace("", "미상")
-    )
-
-    # 숫자형 데이터 변환
-    numeric_cols = [
-        "first_scrn",
-        "first_show",
-        "first_week_audi",
-        "total_audi",
-        "days_in_top10",
-    ]
-
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(
-            df[col],
-            errors="coerce",
-        )
-
-    return df
-
-
-try:
-
-    df = load_data()
-
-except Exception as e:
-
-    st.error("😢 앗! 데이터를 불러오지 못했어요.")
-    st.exception(e)
-    st.stop()
-
-
-# ============================================================
-# 🎬 메인 화면
-# ============================================================
-
+# =========================================================
+# 제목
+# =========================================================
 st.markdown(
     '<div class="main-title">🎬 영화 데이터 그래프 도감 2</div>',
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="sub-title">분포와 관계를 살펴보는 영화 데이터 탐험 🍿</div>',
-    unsafe_allow_html=True,
+    '<div class="subtitle">분포와 관계를 그래프로 살펴보는 영화 데이터 분석</div>',
+    unsafe_allow_html=True
 )
 
-# 귀여운 뱃지
-st.markdown(
-    """
-    <div style="text-align:center;">
 
-        <span class="badge">🎞️ 영화 216편</span>
-        <span class="badge">🍿 박스오피스 TOP 10</span>
-        <span class="badge">📊 데이터 시각화</span>
-        <span class="badge">✨ 7개의 그래프</span>
+# =========================================================
+# 기본 통계
+# =========================================================
+col1, col2, col3 = st.columns(3)
 
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with col1:
+    st.markdown(
+        f"""
+        <div class="stat-card">
+            <div class="stat-number">{len(df):,}</div>
+            <div class="stat-label">🎞️ 전체 영화 수</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col2:
+    st.markdown(
+        f"""
+        <div class="stat-card">
+            <div class="stat-number">{df["genre"].nunique()}</div>
+            <div class="stat-label">🎭 장르 수</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col3:
+    st.markdown(
+        f"""
+        <div class="stat-card">
+            <div class="stat-number">{df["nation"].nunique()}</div>
+            <div class="stat-label">🌏 제작 국가 수</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 st.write("")
 
 
-# ============================================================
-# 📌 데이터 요약 카드
-# ============================================================
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-
-    st.markdown(
-        f"""
-        <div class="stat-card">
-            <div class="stat-number">🎬 {len(df)}편</div>
-            <div class="stat-label">분석한 영화</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col2:
-
-    st.markdown(
-        f"""
-        <div class="stat-card">
-            <div class="stat-number">🎨 {df["genre"].nunique()}개</div>
-            <div class="stat-label">장르</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col3:
-
-    st.markdown(
-        f"""
-        <div class="stat-card">
-            <div class="stat-number">🌏 {df["nation"].nunique()}개</div>
-            <div class="stat-label">제작 국가</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-st.divider()
-
-
-# ============================================================
-# 💡 그래프 설명 입력 영역
-# ============================================================
-
-def insight_box(key, placeholder):
-
-    st.markdown(
-        """
-        <div class="insight-card">
-            <div class="insight-title">
-                💡 이 그래프로 알 수 있는 것
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.text_input(
-        "한 문장으로 정리해 보세요 ✍️",
-        placeholder=placeholder,
-        key=key,
-        label_visibility="collapsed",
-    )
-
-
-# ============================================================
-# 1️⃣ 장르별 영화 편수
-# ============================================================
-
+# =========================================================
+# GRAPH 01
+# 장르별 영화 수
+# =========================================================
 st.markdown(
-    '<div class="section-title">1️⃣ 🎨 장르별 영화 편수</div>',
-    unsafe_allow_html=True,
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 01</div>
+
+        <div class="section-title">
+            🎭 장르별 영화 수
+        </div>
+
+        <div class="section-description">
+            어떤 장르의 영화가 가장 많이 포함되어 있는지 확인해 봅니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
 )
 
-genre_counts = (
-    df["genre"]
-    .value_counts()
-    .rename_axis("장르")
-    .reset_index(name="편수")
-)
+genre_count = df["genre"].value_counts().reset_index()
+genre_count.columns = ["genre", "count"]
 
 fig1 = px.pie(
-    genre_counts,
-    names="장르",
-    values="편수",
-    hole=0.52,
-    title="🍩 어떤 장르의 영화가 가장 많을까?",
+    genre_count,
+    names="genre",
+    values="count",
+    hole=0.45
 )
 
 fig1.update_traces(
-    textposition="inside",
-    textinfo="percent",
+    textinfo="label+percent",
     hovertemplate=(
-        "🎬 <b>%{label}</b><br>"
-        "편수: %{value}편<br>"
+        "<b>%{label}</b><br>"
+        "영화 수: %{value}편<br>"
         "비율: %{percent}"
         "<extra></extra>"
-    ),
+    )
 )
 
 fig1.update_layout(
-    legend_title_text="🎨 장르",
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=500,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig1,
-    use_container_width=True,
+    use_container_width=True
 )
-
-insight_box(
-    "genre_insight",
-    "예: 가장 많은 장르는 ○○이고 전체 영화의 약 ○○%를 차지한다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 2️⃣ 장르 → 영화 트리맵
-# ============================================================
 
 st.markdown(
-    '<div class="section-title">2️⃣ 🌳 장르 속 영화 트리맵</div>',
-    unsafe_allow_html=True,
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
 )
 
-treemap_df = df[
-    [
-        "genre",
-        "movieNm",
-        "total_audi",
-    ]
-].dropna(
-    subset=[
-        "movieNm",
-        "total_audi",
-    ]
+st.text_input(
+    "장르 분포에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_1"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 02
+# 장르 → 영화 트리맵
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 02</div>
+
+        <div class="section-title">
+            🌳 장르별 흥행 규모
+        </div>
+
+        <div class="section-description">
+            타일의 크기가 클수록 누적 관객 수가 많은 영화입니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
 )
 
 fig2 = px.treemap(
-    treemap_df,
-    path=[
-        "genre",
-        "movieNm",
-    ],
-    values="total_audi",
-    title="🌳 칸이 클수록 총 관객이 많은 영화!",
+    df,
+    path=["genre", "movieNm"],
+    values="total_audi"
 )
 
 fig2.update_traces(
     hovertemplate=(
-        "🎬 <b>%{label}</b><br>"
-        "🍿 총 관객: %{value:,.0f}명"
+        "<b>%{label}</b><br>"
+        "누적 관객 수: %{value:,.0f}명"
         "<extra></extra>"
     )
 )
 
 fig2.update_layout(
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=600,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig2,
-    use_container_width=True,
+    use_container_width=True
 )
-
-st.caption(
-    "👀 영화 칸에 마우스를 올려 영화명과 총 관객을 확인해 보세요!"
-)
-
-insight_box(
-    "treemap_insight",
-    "예: ○○ 장르에서 총 관객이 많은 영화들이 특히 크게 나타난다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 3️⃣ 총 관객 히스토그램
-# ============================================================
 
 st.markdown(
-    '<div class="section-title">3️⃣ 🍿 총 관객은 어디에 몰려 있을까?</div>',
-    unsafe_allow_html=True,
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
 )
 
-hist_df = df.dropna(
-    subset=[
-        "total_audi",
-    ]
-).copy()
+st.text_input(
+    "장르별 흥행 규모에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_2"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 03
+# 누적 관객 수 히스토그램
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 03</div>
+
+        <div class="section-title">
+            📊 누적 관객 수 분포
+        </div>
+
+        <div class="section-description">
+            영화들의 누적 관객 수가 어느 구간에 가장 많이 몰려 있는지 확인합니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
+)
 
 fig3 = px.histogram(
-    hist_df,
+    df,
     x="total_audi",
     nbins=20,
-    title="📊 영화별 총 관객 분포",
     labels={
-        "total_audi": "총 관객",
-        "count": "영화 편수",
-    },
-)
-
-fig3.update_traces(
-    hovertemplate=(
-        "🍿 총 관객 구간: %{x}<br>"
-        "🎬 영화 편수: %{y}편"
-        "<extra></extra>"
-    )
+        "total_audi": "누적 관객 수"
+    }
 )
 
 fig3.update_layout(
-    xaxis_title="🍿 총 관객",
-    yaxis_title="🎬 영화 편수",
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=500,
+    xaxis_title="누적 관객 수",
+    yaxis_title="영화 수",
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig3,
-    use_container_width=True,
+    use_container_width=True
 )
 
+# 가장 영화가 많이 몰린 구간 계산
+hist_counts, bin_edges = np.histogram(
+    df["total_audi"].dropna(),
+    bins=20
+)
 
-# 가장 관객이 많은 영화
-max_audience_row = df.loc[
+max_bin_index = hist_counts.argmax()
+
+bin_start = bin_edges[max_bin_index]
+bin_end = bin_edges[max_bin_index + 1]
+
+# 가장 관객 수가 많은 영화
+highest_movie_row = df.loc[
     df["total_audi"].idxmax()
 ]
 
-max_movie = max_audience_row["movieNm"]
-max_audience = max_audience_row["total_audi"]
-
-
-# 가장 영화가 많이 몰린 구간
-counts, bin_edges = pd.cut(
-    hist_df["total_audi"],
-    bins=20,
-    retbins=True,
-    include_lowest=True,
-)
-
-bin_counts = counts.value_counts().sort_index()
-
-most_common_bin = bin_counts.idxmax()
-
-
-st.success(
-    f"🎯 **영화가 가장 많이 몰려 있는 구간:** "
-    f"{most_common_bin.left:,.0f}명 ~ "
-    f"{most_common_bin.right:,.0f}명\n\n"
-    f"🏆 **가장 많은 관객을 모은 영화:** "
-    f"**{max_movie}** — "
-    f"{max_audience:,.0f}명"
-)
-
-insight_box(
-    "histogram_insight",
-    "예: 대부분의 영화는 ○○만 명 이하 구간에 몰려 있으며, 가장 많은 관객을 모은 영화는 ○○이다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 4️⃣ 스크린수 × 총 관객 산점도
-# ============================================================
+highest_movie = highest_movie_row["movieNm"]
+highest_audience = highest_movie_row["total_audi"]
 
 st.markdown(
-    '<div class="section-title">4️⃣ 🔎 개봉일 스크린수와 총 관객의 관계</div>',
-    unsafe_allow_html=True,
+    f"""
+    <div class="result-box">
+
+        📌 <b>가장 영화가 많이 몰린 관객 구간</b><br>
+        약 {bin_start:,.0f}명 ~ {bin_end:,.0f}명
+
+        <br><br>
+
+        🏆 <b>가장 많은 관객을 모은 영화</b><br>
+        {highest_movie} — {highest_audience:,.0f}명
+
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
-scatter_df = df.dropna(
-    subset=[
-        "first_scrn",
-        "total_audi",
-        "movieNm",
-        "genre",
-    ]
-).copy()
+st.markdown(
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
+)
+
+st.text_input(
+    "관객 수 분포에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_3"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 04
+# 스크린 수 vs 누적 관객 수
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 04</div>
+
+        <div class="section-title">
+            📈 스크린 수와 누적 관객 수의 관계
+        </div>
+
+        <div class="section-description">
+            개봉 당시 스크린 수가 많을수록 최종 관객 수도 많아지는지 살펴봅니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
+)
 
 fig4 = px.scatter(
-    scatter_df,
+    df,
     x="first_scrn",
     y="total_audi",
     color="genre",
     hover_name="movieNm",
-    title="🔎 스크린수가 많으면 관객도 많을까?",
     labels={
-        "first_scrn": "개봉일 스크린수",
-        "total_audi": "총 관객",
-        "genre": "장르",
-    },
-)
-
-fig4.update_traces(
-    hovertemplate=(
-        "🎬 <b>%{hovertext}</b><br>"
-        "📺 개봉일 스크린수: %{x:,.0f}<br>"
-        "🍿 총 관객: %{y:,.0f}명"
-        "<extra></extra>"
-    )
+        "first_scrn": "개봉 첫날 스크린 수",
+        "total_audi": "누적 관객 수",
+        "genre": "장르"
+    }
 )
 
 fig4.update_layout(
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=600,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig4,
-    use_container_width=True,
+    use_container_width=True
 )
-
-st.caption(
-    "🖱️ 점에 마우스를 올리면 영화 이름과 데이터를 볼 수 있어요!"
-)
-
-insight_box(
-    "scatter_insight",
-    "예: 개봉일 스크린수가 많을수록 총 관객도 많아지는 경향이 나타난다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 5️⃣ 장르별 박스플롯
-# ============================================================
 
 st.markdown(
-    '<div class="section-title">5️⃣ 📦 장르별 총 관객 분포 비교</div>',
-    unsafe_allow_html=True,
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
 )
 
-genre_movie_counts = df[
-    "genre"
-].value_counts()
+st.text_input(
+    "스크린 수와 관객 수의 관계에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_4"
+)
 
-selected_genres = genre_movie_counts[
-    genre_movie_counts >= 10
-].index.tolist()
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 05
+# 장르별 관객 수 박스플롯
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 05</div>
+
+        <div class="section-title">
+            📦 장르별 관객 수 분포 비교
+        </div>
+
+        <div class="section-description">
+            영화가 10편 이상 있는 장르만 골라 장르별 관객 수의 차이를 비교합니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
+)
+
+genre_10 = df["genre"].value_counts()
+
+valid_genres = genre_10[
+    genre_10 >= 10
+].index
 
 box_df = df[
-    df["genre"].isin(selected_genres)
-].dropna(
-    subset=[
-        "genre",
-        "total_audi",
-        "movieNm",
-    ]
-).copy()
+    df["genre"].isin(valid_genres)
+]
 
 fig5 = px.box(
     box_df,
     x="genre",
     y="total_audi",
+    color="genre",
     points="outliers",
     hover_name="movieNm",
-    title="📦 영화가 10편 이상인 장르만 비교!",
     labels={
         "genre": "장르",
-        "total_audi": "총 관객",
-    },
-)
-
-fig5.update_traces(
-    hovertemplate=(
-        "🎬 <b>%{hovertext}</b><br>"
-        "🎨 장르: %{x}<br>"
-        "🍿 총 관객: %{y:,.0f}명"
-        "<extra></extra>"
-    )
+        "total_audi": "누적 관객 수"
+    }
 )
 
 fig5.update_layout(
-    xaxis_title="🎨 장르",
-    yaxis_title="🍿 총 관객",
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=600,
+    showlegend=False,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig5,
-    use_container_width=True,
+    use_container_width=True
 )
-
-st.caption(
-    "📦 상자 밖으로 톡 튀어나온 점은 해당 장르에서 상대적으로 특이한 관객 수를 가진 영화예요!"
-)
-
-insight_box(
-    "boxplot_insight",
-    "예: ○○ 장르는 총 관객의 중앙값이 높고 영화별 관객 차이도 크게 나타난다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 6️⃣ 버블 산점도
-# ============================================================
 
 st.markdown(
-    '<div class="section-title">6️⃣ 🫧 첫 주 관객 버블 산점도</div>',
-    unsafe_allow_html=True,
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
 )
 
-bubble_df = df.dropna(
-    subset=[
-        "first_scrn",
-        "total_audi",
-        "first_week_audi",
-        "movieNm",
-        "genre",
-    ]
-).copy()
+st.text_input(
+    "장르별 관객 분포에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_5"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 06
+# 버블 차트
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 06</div>
+
+        <div class="section-title">
+            🫧 스크린 수 · 누적 관객 · 첫 주 관객
+        </div>
+
+        <div class="section-description">
+            스크린 수와 누적 관객 수의 관계를 보면서,
+            버블 크기로 첫 주 관객 수까지 함께 비교합니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
+)
 
 fig6 = px.scatter(
-    bubble_df,
+    df,
     x="first_scrn",
     y="total_audi",
-    color="genre",
     size="first_week_audi",
-    size_max=45,
+    color="genre",
     hover_name="movieNm",
-    title="🫧 버블이 클수록 첫 주 관객이 많아요!",
-    labels={
-        "first_scrn": "개봉일 스크린수",
-        "total_audi": "총 관객",
-        "first_week_audi": "첫 주 관객",
-        "genre": "장르",
+    hover_data={
+        "first_scrn": ":,",
+        "first_week_audi": ":,",
+        "total_audi": ":,",
+        "genre": True
     },
-)
-
-fig6.update_traces(
-    hovertemplate=(
-        "🎬 <b>%{hovertext}</b><br>"
-        "📺 개봉일 스크린수: %{x:,.0f}<br>"
-        "🍿 총 관객: %{y:,.0f}명<br>"
-        "🚀 첫 주 관객: %{marker.size:,.0f}명"
-        "<extra></extra>"
-    )
+    labels={
+        "first_scrn": "개봉 첫날 스크린 수",
+        "total_audi": "누적 관객 수",
+        "first_week_audi": "첫 주 관객 수",
+        "genre": "장르"
+    },
+    size_max=55
 )
 
 fig6.update_layout(
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=650,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig6,
-    use_container_width=True,
+    use_container_width=True
 )
-
-st.caption(
-    "🫧 같은 산점도에 첫 주 관객이라는 정보를 버블 크기로 하나 더 넣었어요!"
-)
-
-insight_box(
-    "bubble_insight",
-    "예: 첫 주 관객이 많았던 영화일수록 큰 버블로 나타나며 총 관객과의 관계를 함께 볼 수 있다.",
-)
-
-st.divider()
-
-
-# ============================================================
-# 7️⃣ 제작 국가 → 장르 선버스트
-# ============================================================
 
 st.markdown(
-    '<div class="section-title">7️⃣ 🌞 제작 국가 → 장르 선버스트</div>',
-    unsafe_allow_html=True,
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
 )
 
-sunburst_df = df[
-    [
-        "nation",
-        "genre",
-    ]
-].dropna(
-    subset=[
-        "nation",
-        "genre",
-    ]
-).copy()
+st.text_input(
+    "첫 주 관객과 최종 흥행에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_6"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 07
+# 국가 → 장르 선버스트
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 07</div>
+
+        <div class="section-title">
+            🌏 제작 국가와 장르의 관계
+        </div>
+
+        <div class="section-description">
+            어느 국가의 영화가 어떤 장르로 많이 만들어졌는지 한눈에 살펴봅니다.
+        </div>
+
+    """,
+    unsafe_allow_html=True
+)
 
 fig7 = px.sunburst(
-    sunburst_df,
-    path=[
-        "nation",
-        "genre",
-    ],
-    title="🌏 어느 나라에서 어떤 장르의 영화를 만들었을까?",
+    df,
+    path=["nation", "genre"]
 )
 
 fig7.update_traces(
     hovertemplate=(
-        "🎬 <b>%{label}</b><br>"
-        "📚 영화 편수: %{value}편"
+        "<b>%{label}</b><br>"
+        "영화 수: %{value}편"
         "<extra></extra>"
     )
 )
 
 fig7.update_layout(
-    margin=dict(
-        t=70,
-        l=20,
-        r=20,
-        b=20,
-    ),
+    height=650,
+    margin=dict(t=20, b=20, l=20, r=20)
 )
 
 st.plotly_chart(
     fig7,
-    use_container_width=True,
+    use_container_width=True
 )
-
-st.caption(
-    "🌞 안쪽은 제작 국가, 바깥쪽은 장르예요! 국가 → 장르 순서로 살펴보세요."
-)
-
-insight_box(
-    "sunburst_insight",
-    "예: 제작 국가별로 영화 수의 차이가 있으며 국가 안에서도 장르 구성이 다르게 나타난다.",
-)
-
-
-# ============================================================
-# 🎉 마지막
-# ============================================================
-
-st.divider()
 
 st.markdown(
-    """
-    <div style="
-        text-align:center;
-        padding:25px;
-        border-radius:20px;
-        background-color:#F3EEFA;
-        border:1px solid #E4DCEF;
-    ">
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
+)
 
-        <div style="font-size:2rem;">
-            🎬 🍿 📊 🫧 🌳
+st.text_input(
+    "제작 국가와 장르의 관계에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_7"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# GRAPH 08
+# 첫 주 흥행 비중 분석
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card">
+
+        <div class="badge">GRAPH 08 · 추가 분석</div>
+
+        <div class="section-title">
+            🔥 첫 주 흥행 비중과 최종 흥행
         </div>
 
-        <h3 style="color:#6B5B95;">
-            영화 데이터 탐험 완료! 🎉
-        </h3>
+        <div class="section-description">
+            개봉 첫 주에 최종 관객의 몇 %를 모았는지 비교합니다.
+            첫 주 흥행 비중이 높을수록 초반에 관객이 집중된 영화라고 볼 수 있습니다.
+        </div>
 
-        <p style="color:#777;">
-            그래프에 마우스를 올려서<br>
-            영화 데이터를 재미있게 살펴보세요! 🔎✨
-        </p>
+    """,
+    unsafe_allow_html=True
+)
+
+# 분석에 사용할 데이터
+analysis_df = df[
+    (df["total_audi"] > 0) &
+    (df["first_week_audi"].notna())
+].copy()
+
+# 첫 주 관객 비중 계산
+analysis_df["first_week_ratio"] = (
+    analysis_df["first_week_audi"]
+    / analysis_df["total_audi"]
+    * 100
+)
+
+# 정상적인 비율만 사용
+analysis_df = analysis_df[
+    analysis_df["first_week_ratio"].between(0, 100)
+]
+
+# 8번 그래프
+fig8 = px.scatter(
+    analysis_df,
+    x="first_week_ratio",
+    y="total_audi",
+    color="genre",
+    hover_name="movieNm",
+    hover_data={
+        "first_week_ratio": ":.1f",
+        "first_week_audi": ":,",
+        "total_audi": ":,",
+        "genre": True
+    },
+    labels={
+        "first_week_ratio": "첫 주 관객 비중 (%)",
+        "total_audi": "누적 관객 수",
+        "first_week_audi": "첫 주 관객 수",
+        "genre": "장르"
+    }
+)
+
+fig8.update_layout(
+    height=650,
+    xaxis_title="첫 주 관객 비중 (%)",
+    yaxis_title="누적 관객 수",
+    margin=dict(t=20, b=20, l=20, r=20)
+)
+
+st.plotly_chart(
+    fig8,
+    use_container_width=True
+)
+
+
+# =========================================================
+# GRAPH 08 분석 결과
+# =========================================================
+if len(analysis_df) > 0:
+
+    highest_ratio_row = analysis_df.loc[
+        analysis_df["first_week_ratio"].idxmax()
+    ]
+
+    lowest_ratio_row = analysis_df.loc[
+        analysis_df["first_week_ratio"].idxmin()
+    ]
+
+    average_ratio = analysis_df["first_week_ratio"].mean()
+
+    st.markdown(
+        f"""
+        <div class="result-box">
+
+            📌 <b>전체 영화의 평균 첫 주 관객 비중</b><br>
+            약 {average_ratio:.1f}%
+
+            <br><br>
+
+            🚀 <b>첫 주 관객 비중이 가장 높은 영화</b><br>
+            {highest_ratio_row["movieNm"]}
+            — {highest_ratio_row["first_week_ratio"]:.1f}%
+
+            <br><br>
+
+            🌱 <b>첫 주 관객 비중이 가장 낮은 영화</b><br>
+            {lowest_ratio_row["movieNm"]}
+            — {lowest_ratio_row["first_week_ratio"]:.1f}%
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+else:
+
+    st.warning(
+        "첫 주 관객 수와 누적 관객 수를 이용할 수 있는 데이터가 없습니다."
+    )
+
+
+st.markdown(
+    '<div class="info-box"><b>💡 이 그래프로 알 수 있는 것</b></div>',
+    unsafe_allow_html=True
+)
+
+st.text_input(
+    "첫 주 흥행 비중에 대한 한 문장 해석을 작성해 보세요.",
+    key="interpretation_8"
+)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# 마무리
+# =========================================================
+st.markdown(
+    """
+    <div class="section-card" style="text-align:center;">
+
+        <div class="section-title">
+            🎉 분석 완료!
+        </div>
+
+        <div class="section-description">
+            총 8개의 그래프를 통해 영화 데이터를 여러 관점에서 살펴보았습니다.
+        </div>
+
+        <div class="result-box">
+
+            🎭 장르 분포<br>
+            🌳 장르별 흥행 규모<br>
+            📊 관객 수 분포<br>
+            📈 스크린 수와 관객 수의 관계<br>
+            📦 장르별 관객 분포<br>
+            🫧 첫 주 관객과 최종 관객의 관계<br>
+            🌏 국가와 장르의 관계<br>
+            🔥 첫 주 흥행 비중과 최종 흥행
+
+        </div>
 
     </div>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
